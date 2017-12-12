@@ -3,35 +3,37 @@
 @date: 2017/10/05
 @desc: Scraper for sina weibo.
 """
-import time
 import re
-import requests
-from exceptions import MethodParamError
-from weibo.items import WeiboUserItem, WeiboContentItem, WeiboRepostContentItem
-from base_spider import SocialMediaSpider
-from configs import weibo_user_fans_url, weibo_user_follow_url, weibo_user_info_url, \
-    weibo_user_profile_url, weibo_user_weibo_url, log_path, log_weibo
+import time
 
+import requests
+
+from lib.base_spider import SocialMediaSpider
+from lib.configs import weibo_user_fans_url, weibo_user_follow_url, weibo_user_info_url, \
+    weibo_user_profile_url, weibo_user_weibo_url, log_path, log_weibo
+from weibo.items import WeiboUserItem, WeiboContentItem, WeiboRepostContentItem
 
 if log_weibo:
     import logging
     import datetime
+
     log_file = log_path + "/weibo-log-%s.log" % (datetime.date.today())
-    logging.basicConfig(filename=log_file, format="%(asctime)s - %(name)s - %(levelname)s - %(module)s: %(message)s",
+    logging.basicConfig(filename=log_file,
+                        format="%(asctime)s - %(name)s - %(levelname)s - %(module)s: %(message)s",
                         datefmt="%Y-%m-%d %H:%M:%S %p", level=10)
 
 
 class WeiboSpider(SocialMediaSpider):
     def __init__(self):
-        self.cookies = {}
         self.scraped_infos = {}
         self.scraped_follows = {}
         self.scraped_fans = {}
         self.scraped_weibos = {}
 
     def scrape_user_info(self, id):
-        if not isinstance(id, int):
-            raise MethodParamError('Parameter \'id\' isn\'t an instance of type \'int\'!')
+        assert isinstance(id, int), 'Parameter \'id\' isn\'t an instance of type \'int\'!'
+        assert id > 0, 'Parameter \'id\' isn\'t positive!'
+
         if log_weibo:
             logging.info('Scraping info of weibo user: %d...' % id)
         item = WeiboUserItem()
@@ -76,30 +78,24 @@ class WeiboSpider(SocialMediaSpider):
         self.scraped_infos[id] = item
         return item
 
-    def scrape_user_follows(self, id, number=0):
-        if not isinstance(id, int):
-            raise MethodParamError('Parameter \'id\' isn\'t an instance of type \'int\'!')
-        if not isinstance(number, int):
-            raise MethodParamError('Parameter \'number\' isn\'t an instance of type \'int\'!')
+    def scrape_user_follows(self, id, number=1):
+        assert isinstance(id, int), 'Parameter \'id\' isn\'t an instance of type \'int\'!'
+        assert isinstance(number, int), 'Parameter \'number\' isn\'t an instance of type \'int\'!'
+        assert number >= 1, 'Parameter \'number\' is smaller than 1!'
+
         if log_weibo:
             logging.info('Scraping follows of weibo user: %d...' % id)
         response = requests.get(weibo_user_follow_url.format(uid=id, page=1))
         result = response.json()
         total = result.get('data').get('count')
-        if number <= 0:
-            need_count = 10
-        else:
-            need_count = number if number < total else total
-        finish_count = 0
+        number = min((number, total))
         follows = []
         position = 0
-        while finish_count < need_count:
+        while len(follows) < number:
             position += 1
             response = requests.get(weibo_user_follow_url.format(uid=id, page=position))
             result = response.json()
             for user in result.get('data').get('users'):
-                if finish_count >= need_count:
-                    break
                 item = WeiboUserItem()
                 item.id = user.get('id')
                 item.profile_url = 'https://weibo.com/u/{uid}'.format(uid=item.id)
@@ -125,36 +121,31 @@ class WeiboSpider(SocialMediaSpider):
                         elif item_name == '注册时间':
                             item.signup_time = item_content
                 follows.append(item)
-                finish_count += 1
+                if len(follows) >= number:
+                    break
         if log_weibo:
             logging.info('Succeed in scraping follows of weibo user: %d.' % id)
         self.scraped_follows[id] = follows
         return follows
 
-    def scrape_user_fans(self, id, number=0):
-        if not isinstance(id, int):
-            raise MethodParamError('Parameter \'id\' isn\'t an instance of type \'int\'!')
-        if not isinstance(number, int):
-            raise MethodParamError('Parameter \'number\' isn\'t an instance of type \'int\'!')
+    def scrape_user_fans(self, id, number=1):
+        assert isinstance(id, int), 'Parameter \'id\' isn\'t an instance of type \'int\'!'
+        assert isinstance(number, int), 'Parameter \'number\' isn\'t an instance of type \'int\'!'
+        assert number >= 1, 'Parameter \'number\' is smaller than 1!'
+
         if log_weibo:
             logging.info('Scraping fans of weibo user: %d...' % id)
         response = requests.get(weibo_user_fans_url.format(uid=id, page=1))
         result = response.json()
         total = result.get('data').get('count')
-        if number <= 0:
-            need_count = 10
-        else:
-            need_count = number if number < total else total
-        finish_count = 0
+        number = min((number, total))
         fans = []
         position = 0
-        while finish_count < need_count:
+        while len(fans) < number:
             position += 1
             response = requests.get(weibo_user_fans_url.format(uid=id, page=position))
             result = response.json()
             for user in result.get('data').get('users'):
-                if finish_count >= need_count:
-                    break
                 item = WeiboUserItem()
                 item.id = user.get('id')
                 item.profile_url = 'https://weibo.com/u/{uid}'.format(uid=item.id)
@@ -180,17 +171,18 @@ class WeiboSpider(SocialMediaSpider):
                         elif item_name == '注册时间':
                             item.signup_time = item_content
                 fans.append(item)
-                finish_count += 1
+                if len(fans) >= number:
+                    break
         if log_weibo:
             logging.info('Succeed in scraping follows of weibo user: %d.' % id)
         self.scraped_fans[id] = fans
         return fans
 
-    def scrape_user_weibo(self, id, before=None, after=None, number=0):
-        if not isinstance(id, int):
-            raise MethodParamError('Parameter \'id\' isn\'t an instance of type \'int\'!')
-        if not isinstance(number, int):
-            raise MethodParamError('Parameter \'number\' isn\'t an instance of type \'int\'!')
+    def scrape_user_weibo(self, id, before=None, after=None, number=1):
+        assert isinstance(id, int), 'Parameter \'id\' isn\'t an instance of type \'int\'!'
+        assert isinstance(number, int), 'Parameter \'number\' isn\'t an instance of type \'int\'!'
+        assert number >= 1, 'Parameter \'number\' is smaller than 1!'
+
         before = int(time.time()) if before is None else int(before)
         after = 0 if after is None else int(after)
         if log_weibo:
@@ -198,22 +190,15 @@ class WeiboSpider(SocialMediaSpider):
         response = requests.get(weibo_user_weibo_url.format(uid1=id, uid2=id, page=1))
         result = response.json()
         total = result.get('data').get('cardlistInfo').get('total')
-        if number <= 0:
-            need_count = 10
-        else:
-            need_count = number if number < total else total
-        finish_count = 0
+        number = min((number, total))
         weibos = []
         position = 0
         stop_flag = False
-        while finish_count < need_count:
+        while len(weibos) < number:
             position += 1
-            print(weibo_user_weibo_url.format(uid1=id, uid2=id, page=position))
             response = requests.get(weibo_user_weibo_url.format(uid1=id, uid2=id, page=position))
             result = response.json()
             for card in result.get('data').get('cards'):
-                if finish_count >= need_count:
-                    break
                 if card.get('card_type') != 9:
                     continue
                 res = requests.get(card.get('scheme'))
@@ -223,13 +208,16 @@ class WeiboSpider(SocialMediaSpider):
                 time_lst.pop(-2)  # 删除时区信息
                 time_str = ' '.join(time_lst)
                 time_value = time.mktime(time.strptime(time_str, '%a %b %d %H:%M:%S %Y'))  # 获取时间戳
+                mblog = card.get('mblog')
                 if time_value > before:
                     continue
                 if time_value < after:
-                    stop_flag = True
-                    break
-                mblog = card.get('mblog')
-                if 'retweeted_status' in mblog.keys():      # 转发微博
+                    if not mblog.get('isTop'):  # 置顶微博有可能造成异常
+                        stop_flag = True
+                        break
+                    else:
+                        continue
+                if 'retweeted_status' in mblog.keys():  # 转发微博
                     item = WeiboRepostContentItem()
                     retweet = mblog.get('retweeted_status')
                     item.content = retweet.get('text')
@@ -240,18 +228,24 @@ class WeiboSpider(SocialMediaSpider):
                     if 'page_info' in retweet.keys():
                         item.media_pic = retweet.get('page_info').get('page_pic').get('url')
                         page_url = retweet.get('page_info').get('page_url')
-                        if re.match(r'http://media\.weibo\.cn/article\?.*id=\d+', page_url):    # 移动端文章链接打不开，将其换为PC端链接
-                            article_id = re.search(r'http://media\.weibo\.cn/article\?.*id=(\d+)', page_url).group(1)
-                            item.media_url = 'https://weibo.com/ttarticle/p/show?id={id}'.format(id=article_id)
+                        if re.match(r'http://media\.weibo\.cn/article\?.*id=\d+',
+                                    page_url):  # 移动端文章链接打不开，将其换为PC端链接
+                            article_id = re.search(r'http://media\.weibo\.cn/article\?.*id=(\d+)',
+                                                   page_url).group(
+                                1)
+                            item.media_url = 'https://weibo.com/ttarticle/p/show?id={id}'.format(
+                                id=article_id)
                         else:
                             item.media_url = page_url
-                    if retweet.get('user') is not None:     # 原微博可能已被删除
-                        item.source_url = 'https://weibo.com/{uid}/{bid}'.format(uid=retweet.get('user').get('id'),
-                                                                                 bid=item.source_id)
+                    if retweet.get('user') is not None:  # 原微博可能已被删除
+                        item.source_url = 'https://weibo.com/{uid}/{bid}'.format(
+                            uid=retweet.get('user').get('id'),
+                            bid=item.source_id)
                         item.source_owner.id = retweet.get('user').get('id')
                         item.source_owner.name = retweet.get('user').get('screen_name')
                         item.source_owner.avatar_url = retweet.get('user').get('profile_image_url')
-                        item.source_owner.profile_url = 'https://weibo.com/u/{uid}'.format(uid=item.source_owner.id)
+                        item.source_owner.profile_url = 'https://weibo.com/u/{uid}'.format(
+                            uid=item.source_owner.id)
                     item.repost_reason = mblog.get('text')
                 else:
                     item = WeiboContentItem()
@@ -262,9 +256,13 @@ class WeiboSpider(SocialMediaSpider):
                     if 'page_info' in mblog.keys():
                         item.media_pic = mblog.get('page_info').get('page_pic').get('url')
                         page_url = mblog.get('page_info').get('page_url')
-                        if re.match(r'http://media\.weibo\.cn/article\?.*id=\d+', page_url):  # 移动端文章链接打不开，将其换为PC端链接
-                            article_id = re.search(r'http://media\.weibo\.cn/article\?.*id=(\d+)', page_url).group(1)
-                            item.media_url = 'https://weibo.com/ttarticle/p/show?id={id}'.format(id=article_id)
+                        if re.match(r'http://media\.weibo\.cn/article\?.*id=\d+',
+                                    page_url):  # 移动端文章链接打不开，将其换为PC端链接
+                            article_id = re.search(r'http://media\.weibo\.cn/article\?.*id=(\d+)',
+                                                   page_url).group(
+                                1)
+                            item.media_url = 'https://weibo.com/ttarticle/p/show?id={id}'.format(
+                                id=article_id)
                         else:
                             item.media_url = page_url
                 item.id = mblog.get('bid')
@@ -276,8 +274,9 @@ class WeiboSpider(SocialMediaSpider):
                 item.time = time_value
                 item.source = mblog.get('source')
                 weibos.append(item)
-                finish_count += 1
-            if finish_count >= need_count or stop_flag:
+                if len(weibos) >= number:
+                    break
+            if stop_flag:
                 break
         if log_weibo:
             logging.info('Succeed in scraping weibos of weibo user: %d.' % id)

@@ -3,6 +3,7 @@
 @date: 2017/11/25
 @desc: Test weibo spider.
 """
+import time
 from weibo.spider import WeiboSpider
 
 
@@ -26,8 +27,8 @@ def scrape_user_fans_test(id, number):
         print(fan)
 
 
-def scrape_user_weibo_test(id, number):
-    weibos = spider.scrape_user_weibo(id, number)
+def scrape_user_weibo_test(id, before=None, after=None, number=10):
+    weibos = spider.scrape_user_weibo(id, before, after, number)
     for weibo in weibos:
         print(weibo)
 
@@ -35,4 +36,6 @@ def scrape_user_weibo_test(id, number):
 scrape_user_info_test(5648343109)
 scrape_user_follows_test(5648343109, 10)
 scrape_user_fans_test(5648343109, 10)
-scrape_user_weibo_test(1618051664, 10)
+time1 = time.time()
+time2 = time.mktime(time.strptime('2017-12-2 12:00:00', '%Y-%m-%d %H:%M:%S'))
+scrape_user_weibo_test(1618051664, time1, time2, 20)

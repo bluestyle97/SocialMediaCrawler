@@ -3,6 +3,7 @@
 @date: 2017/11/25
 @desc: Test zhihu spider.
 """
+import time
 from zhihu.spider import ZhihuSpider
 
 
@@ -60,12 +61,14 @@ def scrape_answers_by_user_test(user, number):
         print(answer)
 
 
-scrape_user_info_test('excited-vczh')
-scrape_user_follows_test('excited-vczh', 10)
-scrape_user_fans_test('excited-vczh', 10)
-scrape_user_activities_test('excited-vczh', before=1512772706, after=1512768892)
-scrape_question_by_id_test(58035825)
-scrape_questions_by_user_test('excited-vczh', 10)
-scrape_answer_by_id_test(265325555)
-scrape_answers_by_question_test(58035825, 10)
-scrape_answers_by_user_test('excited-vczh', 10)
+#scrape_user_info_test('excited-vczh')
+#scrape_user_follows_test('excited-vczh', 10)
+#scrape_user_fans_test('excited-vczh', 10)
+time_1 = int(time.time())
+time_2 = int(time.mktime(time.strptime('2017-12-1 12:00:00', '%Y-%m-%d %H:%M:%S')))
+scrape_user_activities_test('kaifulee', before=time_1, after=time_2, number=20)
+#scrape_question_by_id_test(58035825)
+#scrape_questions_by_user_test('excited-vczh', 10)
+#scrape_answer_by_id_test(265325555)
+#scrape_answers_by_question_test(58035825, 10)
+#scrape_answers_by_user_test('excited-vczh', 10)

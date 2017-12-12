@@ -6,16 +6,17 @@
 import json
 import os
 import re
-import requests
 from math import ceil
+
+import requests
 from selenium import webdriver
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
-from qzone.items import *
-from base_spider import SocialMediaSpider
-from configs import qzone_comment_url, qzone_emotion_url, qzone_headers, qzone_like_url, \
-    qzone_message_url, qzone_visitor_url, log_path, log_qzone
 
+from lib.base_spider import SocialMediaSpider
+from lib.configs import qzone_comment_url, qzone_emotion_url, qzone_headers, qzone_like_url, \
+    qzone_message_url, qzone_visitor_url, log_path, log_qzone
+from qzone.items import *
 
 driver = webdriver.PhantomJS(executable_path='../phantomjs', service_log_path=os.path.devnull)
 
@@ -40,7 +41,7 @@ class QzoneSpider(SocialMediaSpider):
     def __init__(self, qq=None, password=None, cookie=None):
         if cookie is None:
             if qq is None or password is None:
-                from exceptions import SpiderInitError
+                from lib.exceptions import SpiderInitError
                 raise SpiderInitError()
             self.qq = qq
             self.password = password
@@ -50,7 +51,7 @@ class QzoneSpider(SocialMediaSpider):
             self.save_cookie()
         else:
             if not os.path.exists(cookie):
-                from exceptions import SpiderInitError
+                from lib.exceptions import SpiderInitError
                 raise SpiderInitError()
             self.load_cookie(path=cookie)
 

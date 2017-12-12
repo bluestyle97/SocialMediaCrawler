@@ -3,7 +3,7 @@
 @date: 2017/11/04
 @desc: Items of zhihu scraping.
 """
-from base_item import SocialMediaItem
+from lib.base_item import SocialMediaItem
 
 
 # 知乎条目基类
@@ -14,28 +14,28 @@ class ZhihuItem(SocialMediaItem):
 # 知乎用户信息条目类
 class ZhihuUserItem(ZhihuItem):
     def __init__(self):
-        self.id = id                        # ID
-        self.name = ''                      # 用户名
-        self.gender = 0                     # 性别 0为女 1为男 -1为未知
-        self.avatar_url = ''                # 头像链接
-        self.business = ''                  # 行业
-        self.headline = ''                  # 一句话描述
-        self.description = ''               # 个人介绍
-        self.question_count = 0             # 提问数
-        self.answer_count = 0               # 回答数
-        self.article_count = 0              # 文章数
-        self.voteup_count = 0               # 得到的赞同数
-        self.thanked_count = 0              # 得到的感谢数
-        self.favorited_count = 0            # 得到的收藏数
-        self.following_count = 0            # 关注数
-        self.follower_count = 0             # 粉丝数
-        self.following_topic_count = 0      # 关注的话题数
-        self.following_column_count = 0     # 关注的专栏数
-        self.following_question_count = 0   # 关注的问题数
-        self.following_favlist_count = 0    # 关注的收藏夹数
-        self.educations = []                # 教育经历
-        self.employments = []               # 职业经历
-        self.locations = []                 # 居住地
+        self.id = id  # ID
+        self.name = ''  # 用户名
+        self.gender = 0  # 性别 0为女 1为男 -1为未知
+        self.avatar_url = ''  # 头像链接
+        self.business = ''  # 行业
+        self.headline = ''  # 一句话描述
+        self.description = ''  # 个人介绍
+        self.question_count = 0  # 提问数
+        self.answer_count = 0  # 回答数
+        self.article_count = 0  # 文章数
+        self.voteup_count = 0  # 得到的赞同数
+        self.thanked_count = 0  # 得到的感谢数
+        self.favorited_count = 0  # 得到的收藏数
+        self.following_count = 0  # 关注数
+        self.follower_count = 0  # 粉丝数
+        self.following_topic_count = 0  # 关注的话题数
+        self.following_column_count = 0  # 关注的专栏数
+        self.following_question_count = 0  # 关注的问题数
+        self.following_favlist_count = 0  # 关注的收藏夹数
+        self.educations = []  # 教育经历
+        self.employments = []  # 职业经历
+        self.locations = []  # 居住地
 
     def __str__(self):
         string = ''
@@ -75,8 +75,8 @@ class ZhihuUserItem(ZhihuItem):
 # 知乎用户教育经历条目类
 class ZhihuEducationItem(ZhihuItem):
     def __init__(self):
-        self.school = ''      # 学校
-        self.major = ''       # 专业
+        self.school = ''  # 学校
+        self.major = ''  # 专业
 
     def __str__(self):
         string = 'School: ' + str(self.school) + ', Major:' + str(self.major)
@@ -89,8 +89,8 @@ class ZhihuEducationItem(ZhihuItem):
 # 知乎用户职业经历条目类
 class ZhihuEmploymentItem(ZhihuItem):
     def __init__(self):
-        self.company = ''     # 公司名
-        self.job = ''         # 职位名
+        self.company = ''  # 公司名
+        self.job = ''  # 职位名
 
     def __str__(self):
         string = 'Company: ' + str(self.company) + ', Job: ' + str(self.job)
@@ -103,15 +103,15 @@ class ZhihuEmploymentItem(ZhihuItem):
 # 知乎问题条目类
 class ZhihuQuestionItem(ZhihuItem):
     def __init__(self):
-        self.id = 0                 # 问题ID
-        self.title = ''             # 标题
-        self.create_time = 0        # 创建时间
-        self.update_time = 0        # 更新时间
-        self.content = ''           # 内容
-        self.follower_count = 0     # 关注数
-        self.visit_count = 0        # 浏览数
-        self.comment_count = 0      # 评论数
-        self.topics = []            # 话题标签列表
+        self.id = 0  # 问题ID
+        self.title = ''  # 标题
+        self.create_time = 0  # 创建时间
+        self.update_time = 0  # 更新时间
+        self.content = ''  # 内容
+        self.follower_count = 0  # 关注数
+        self.visit_count = 0  # 浏览数
+        self.comment_count = 0  # 评论数
+        self.topics = []  # 话题标签列表
 
     def __str__(self):
         string = ''
@@ -133,14 +133,14 @@ class ZhihuQuestionItem(ZhihuItem):
 # 知乎答案条目类
 class ZhihuAnswerItem(ZhihuItem):
     def __init__(self):
-        self.id = 0                 # 答案ID
-        self.author = ''            # 答主
-        self.question_id = 0        # 问题ID
-        self.create_time = 0        # 创建时间
-        self.update_time = 0        # 更新时间
-        self.content = ''           # 内容
-        self.voteup_count = ''      # 赞同数
-        self.comment_count = ''     # 评论数
+        self.id = 0  # 答案ID
+        self.author = ''  # 答主
+        self.question_id = 0  # 问题ID
+        self.create_time = 0  # 创建时间
+        self.update_time = 0  # 更新时间
+        self.content = ''  # 内容
+        self.voteup_count = ''  # 赞同数
+        self.comment_count = ''  # 评论数
 
     def __str__(self):
         string = ''
@@ -161,20 +161,20 @@ class ZhihuAnswerItem(ZhihuItem):
 # 知乎用户动态条目
 class ZhihuActivityItem(ZhihuItem):
     def __init__(self):
-        self.id = 0                         # 动态ID（时间戳）
-        self.verb = ''                      # 动态类型
-        self.create_time = 0                # 时间
-        self.actor = ''                     # 主人
-        self.target_user_name = ''          # 目标用户名
-        self.target_user_avatar = ''        # 目标头像链接
-        self.target_user_headline = ''      # 目标用户简介
-        self.target_user_url = ''           # 目标用户主页链接
-        self.target_title = ''              # 目标标题内容
-        self.target_title_url = ''          # 目标标题链接
-        self.target_content = ''            # 目标内容
-        self.target_content_url = ''        # 目标内容链接
-        self.action_text = ''               # 动态类型文字
-        self.thumbnail = ''                 # 缩略图
+        self.id = 0  # 动态ID（时间戳）
+        self.verb = ''  # 动态类型
+        self.create_time = 0  # 时间
+        self.actor = ''  # 主人
+        self.target_user_name = ''  # 目标用户名
+        self.target_user_avatar = ''  # 目标头像链接
+        self.target_user_headline = ''  # 目标用户简介
+        self.target_user_url = ''  # 目标用户主页链接
+        self.target_title = ''  # 目标标题内容
+        self.target_title_url = ''  # 目标标题链接
+        self.target_content = ''  # 目标内容
+        self.target_content_url = ''  # 目标内容链接
+        self.action_text = ''  # 动态类型文字
+        self.thumbnail = ''  # 缩略图
 
     def __str__(self):
         string = ''

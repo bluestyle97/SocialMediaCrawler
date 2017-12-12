@@ -3,7 +3,7 @@
 @date: 1997/10/27
 @desc: Items of qzone scraping.
 """
-from base_item import SocialMediaItem
+from lib.base_item import SocialMediaItem
 
 
 # QQ空间条目基类

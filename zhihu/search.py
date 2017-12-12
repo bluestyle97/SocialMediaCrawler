@@ -4,22 +4,22 @@
 @desc: Search zhihu users and get html.
 """
 import re
+from urllib.request import quote
+
 import requests
 from bs4 import BeautifulSoup
-from urllib.request import quote
-from exceptions import MethodParamError
-from configs import zhihu_search_url, zhihu_header
+
+from lib.configs import zhihu_search_url, zhihu_header
 
 
 def get_user_by_search(user, number=1, start=0):
-    if not isinstance(user, str):
-        raise MethodParamError('Parameter \'user\' must be an instance of \'str\'!')
-    if not isinstance(number, int):
-        raise MethodParamError('Parameter \'number\' must be an instance of \'int\'!')
-    if number <= 0:
-        number = 1
+    assert isinstance(number, int), 'Parameter \'number\' isn\'t an instance of type \'int\'!'
+    assert isinstance(start, int), 'Parameter \'start\' isn\'t an instance of type \'int\'!'
+    assert number >= 1, 'Parameter \'number\' is smaller than 1!'
+
     position = start
-    response = requests.get(zhihu_search_url.format(key=quote(user), offset=position), headers=zhihu_header)
+    response = requests.get(zhihu_search_url.format(key=quote(user), offset=position),
+                            headers=zhihu_header)
     result = response.json()
     user_tokens = []
     user_htmls = []
@@ -32,7 +32,8 @@ def get_user_by_search(user, number=1, start=0):
             break
         if len(user_tokens) < number:
             position += 10
-            response = requests.get(zhihu_search_url.format(key=quote(user), offset=position), headers=zhihu_header)
+            response = requests.get(zhihu_search_url.format(key=quote(user), offset=position),
+                                    headers=zhihu_header)
             result = response.json()
     if len(user_tokens) > number:
         user_tokens = user_tokens[:number]
@@ -41,13 +42,14 @@ def get_user_by_search(user, number=1, start=0):
 
 
 def get_user_by_homepage(url):
-    if not isinstance(url, str):
-        raise MethodParamError('Parameter \'url\' must be an instance of \'str\'!')
-    if not re.match(r'https://www\.zhihu\.com/people/.*', url):     # 不合法的主页地址
+    assert isinstance(url, str), 'Parameter \'url\' must be an instance of \'str\'!'
+
+    if not re.match(r'https://www\.zhihu\.com/people/.*', url):  # 不合法的主页地址
         return None, None
     user = re.search(r'https://www\.zhihu\.com/people/(.*)', url).group(1).split('/')[0]
-    response = requests.get('https://www.zhihu.com/people/' + user + '/activities', headers=zhihu_header)
-    if response.status_code == 404:     # 用户不存在
+    response = requests.get('https://www.zhihu.com/people/' + user + '/activities',
+                            headers=zhihu_header)
+    if response.status_code == 404:  # 用户不存在
         return None, None
     bs = BeautifulSoup(response.text, 'lxml')
     user_name = bs.find('span', {'class': 'ProfileHeader-name'}).get_text()

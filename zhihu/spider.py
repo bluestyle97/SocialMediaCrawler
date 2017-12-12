@@ -5,23 +5,26 @@
 """
 import csv
 import re
-import time
 import requests
+import time
 from bs4 import BeautifulSoup
-from zhihu.items import *
-from exceptions import MethodParamError
-from base_spider import SocialMediaSpider
-from configs import zhihu_user_activity_url, zhihu_answer_query, zhihu_answer_url, zhihu_followers_query, \
-    zhihu_user_followers_url, zhihu_follows_query, zhihu_user_follows_url, zhihu_header, zhihu_question_answers_url, \
-    zhihu_question_query, zhihu_question_url, zhihu_user_answers_url, zhihu_user_query, zhihu_user_questions_url, \
+from lib.base_spider import SocialMediaSpider
+from lib.configs import zhihu_user_activity_url, zhihu_answer_query, zhihu_answer_url, \
+    zhihu_followers_query, \
+    zhihu_user_followers_url, zhihu_follows_query, zhihu_user_follows_url, zhihu_header, \
+    zhihu_question_answers_url, \
+    zhihu_question_query, zhihu_question_url, zhihu_user_answers_url, zhihu_user_query, \
+    zhihu_user_questions_url, \
     zhihu_user_info_url, log_path, log_zhihu
-
+from zhihu.items import *
 
 if log_zhihu:
     import logging
     import datetime
+
     log_file = log_path + "/zhihu-log-%s.log" % (datetime.date.today())
-    logging.basicConfig(filename=log_file, format="%(asctime)s - %(name)s - %(levelname)s - %(module)s: %(message)s",
+    logging.basicConfig(filename=log_file,
+                        format="%(asctime)s - %(name)s - %(levelname)s - %(module)s: %(message)s",
                         datefmt="%Y-%m-%d %H:%M:%S %p", level=10)
 
 
@@ -37,17 +40,18 @@ class ZhihuSpider(SocialMediaSpider):
         self.scraped_user_answers = {}
 
     def scrape_user_info(self, user):
-        if not isinstance(user, str):
-            raise MethodParamError('Parameter \'user\' isn\'t an instance of type \'str\'!')
+        assert isinstance(user, str), 'Parameter \'user\' isn\'t an instance of type \'str\'!'
+
         if log_zhihu:
             logging.info('Scraping info of zhihu user: %s...' % user)
-        response = requests.get(zhihu_user_info_url.format(user=user, include=zhihu_user_query), headers=zhihu_header)
-        if response.status_code == 404:     # 用户不存在或账号被封禁
+        response = requests.get(zhihu_user_info_url.format(user=user, include=zhihu_user_query),
+                                headers=zhihu_header)
+        if response.status_code == 404:  # 用户不存在或账号被封禁
             if log_zhihu:
                 logging.warning('404 error. The user doesn\'t exist or has been blocked.')
             return None
         result = response.json()
-        if result.get('error') is not None: # 身份未经过验证
+        if result.get('error') is not None:  # 身份未经过验证
             if log_zhihu:
                 logging.warning('Your identity hasn\'t been confirmed.')
             return None
@@ -99,43 +103,34 @@ class ZhihuSpider(SocialMediaSpider):
         self.scraped_infos[user] = item
         return item
 
-    def scrape_user_follows(self, user, number=0):
-        if not isinstance(user, str):
-            raise MethodParamError('Parameter \'user\' isn\'t an instance of type \'str\'!')
-        if not isinstance(number, int):
-            raise MethodParamError('Parameter \'number\' isn\'t an instance of type \'int\'!')
+    def scrape_user_follows(self, user, number=1):
+        assert isinstance(user, str), 'Parameter \'user\' isn\'t an instance of type \'str\'!'
+        assert isinstance(number, int), 'Parameter \'number\' isn\'t an instance of type \'int\'!'
+        assert number >= 1, 'Parameter \'number\' is smaller than 1!'
+
         if log_zhihu:
             logging.info('Scraping follows of zhihu user: %s...' % user)
-        response = requests.get(zhihu_user_follows_url.format(user=user, include=zhihu_follows_query, offset=0, limit=20),
-                                headers=zhihu_header)
-        if response.status_code == 404:     # 用户不存在或账号被封禁
+        response = requests.get(
+            zhihu_user_follows_url.format(
+                user=user, include=zhihu_follows_query, offset=0, limit=20),
+            headers=zhihu_header)
+        if response.status_code == 404:  # 用户不存在或账号被封禁
             if log_zhihu:
                 logging.warning('404 error. The user doesn\'t exist or has been blocked.')
             return []
         result = response.json()
         total = result.get('paging').get('totals')
-        if number <= 0:
-            need_count = 10
-        else:
-            need_count = number if number < total else total
-        finish_count = 0
+        number = min((number, total))
         url_tokens = []
-        for data in result.get('data'):
-            if finish_count >= need_count:
-                break
-            url_tokens.append(data.get('url_token'))
-            finish_count += 1
-        if finish_count < need_count:
-            while not result.get('paging').get('is_end'):
-                if finish_count >= need_count:
+        while len(url_tokens) < number:
+            for data in result.get('data'):
+                url_tokens.append(data.get('url_token'))
+                if len(url_tokens) >= number:
                     break
-                next_page = result.get('paging').get('next')
-                result = requests.get(next_page, headers=zhihu_header).json()
-                for data in result.get('data'):
-                    if finish_count >= need_count:
-                        break
-                    url_tokens.append(data.get('url_token'))
-                    finish_count += 1
+            if len(url_tokens) >= number:
+                break
+            next_page = result.get('paging').get('next')
+            result = requests.get(next_page, headers=zhihu_header).json()
         follows = []
         for url_token in url_tokens:
             item = self.scrape_user_info(user=url_token)
@@ -146,41 +141,32 @@ class ZhihuSpider(SocialMediaSpider):
         return follows
 
     def scrape_user_fans(self, user, number=0):
-        if not isinstance(user, str):
-            raise MethodParamError('Parameter \'user\' isn\'t an instance of type \'str\'!')
-        if not isinstance(number, int):
-            raise MethodParamError('Parameter \'number\' isn\'t an instance of type \'int\'!')
+        assert isinstance(user, str), 'Parameter \'user\' isn\'t an instance of type \'str\'!'
+        assert isinstance(number, int), 'Parameter \'number\' isn\'t an instance of type \'int\'!'
+        assert number >= 1, 'Parameter \'number\' is smaller than 1!'
+
         if log_zhihu:
             logging.info('Scraping followers of zhihu user: %s...' % user)
-        response = requests.get(zhihu_user_followers_url.format(user=user, include=zhihu_followers_query, offset=0, limit=20), headers=zhihu_header)
-        if response.status_code == 404:     # 用户不存在或账号被封禁
+        response = requests.get(
+            zhihu_user_followers_url.format(user=user, include=zhihu_followers_query, offset=0,
+                                            limit=20), headers=zhihu_header)
+        if response.status_code == 404:  # 用户不存在或账号被封禁
             if log_zhihu:
                 logging.warning('404 error. The user doesn\'t exist or has been blocked.')
             return []
         result = response.json()
         total = result.get('paging').get('totals')
-        if number <= 0:
-            need_count = 10
-        else:
-            need_count = number if number < total else total
-        finish_count = 0
+        number = min((number, total))
         url_tokens = []
-        for data in result.get('data'):
-            if finish_count >= need_count:
-                break
-            url_tokens.append(data.get('url_token'))
-            finish_count += 1
-        if finish_count < need_count:
-            while not result.get('paging').get('is_end'):
-                if finish_count >= need_count:
+        while len(url_tokens) < number:
+            for data in result.get('data'):
+                url_tokens.append(data.get('url_token'))
+                if len(url_tokens) >= number:
                     break
-                next_page = result.get('paging').get('next')
-                result = requests.get(next_page, headers=zhihu_header).json()
-                for data in result.get('data'):
-                    if finish_count >= need_count:
-                        break
-                    url_tokens.append(data.get('url_token'))
-                    finish_count += 1
+            if len(url_tokens) >= number:
+                break
+            next_page = result.get('paging').get('next')
+            result = requests.get(next_page, headers=zhihu_header).json()
         fans = []
         for url_token in url_tokens:
             item = self.scrape_user_info(user=url_token)
@@ -190,18 +176,17 @@ class ZhihuSpider(SocialMediaSpider):
         self.scraped_followers[user] = fans
         return fans
 
-    def scrape_user_activities(self, user, before=None, after=None, number=10):
-        if not isinstance(user, str):
-            raise MethodParamError('Parameter \'user\' isn\'t an instance of type \'str\'!')
-        if not isinstance(number, int):
-            raise MethodParamError('Parameter \'number\' isn\'t an instance of type \'int\'!')
+    def scrape_user_activities(self, user, before=None, after=None, number=1):
+        assert isinstance(user, str), 'Parameter \'user\' isn\'t an instance of type \'str\'!'
+        assert isinstance(number, int), 'Parameter \'number\' isn\'t an instance of type \'int\'!'
+        assert number >= 1, 'Parameter \'number\' is smaller than 1!'
+
         before = int(time.time()) if before is None else int(before)
         after = 0 if after is None else int(after)
-        if number <= 0:
-            number = 10
         if log_zhihu:
             logging.info('Scraping activities of zhihu user: %s...' % user)
-        response = requests.get(zhihu_user_activity_url.format(user=user, limit=10, after=before), headers=zhihu_header)
+        response = requests.get(zhihu_user_activity_url.format(user=user, limit=10, after=before),
+                                headers=zhihu_header)
         result = response.json()
         activities = []
         stop_flag = False
@@ -216,77 +201,86 @@ class ZhihuSpider(SocialMediaSpider):
                 item.create_time = data.get('created_time')
                 item.actor = data.get('actor').get('url_token')
                 target = data.get('target')
-                if item.verb == 'QUESTION_CREATE' or item.verb == 'QUESTION_FOLLOW':     # 关注了问题，添加了问题
+                if item.verb == 'QUESTION_CREATE' or item.verb == 'QUESTION_FOLLOW':  # 关注了问题，添加了问题
                     item.target_user_name = target.get('author').get('name')
                     item.target_user_avatar = target.get('author').get('avatar_url')
                     item.target_user_headline = target.get('author').get('headline')
                     item.target_user_url = 'https://www.zhihu.com/people/{user}/activities'.format(
                         user=target.get('author').get('url_token'))
                     item.target_title = target.get('title')
-                    item.target_title_url = 'https://www.zhihu.com/question/{id}'.format(id=target.get('id'))
-                elif item.verb == 'ANSWER_VOTE_UP' or item.verb == 'ANSWER_CREATE':     # 赞同了回答，回答了问题
+                    item.target_title_url = 'https://www.zhihu.com/question/{id}'.format(
+                        id=target.get('id'))
+                elif item.verb == 'ANSWER_VOTE_UP' or item.verb == 'ANSWER_CREATE':  # 赞同了回答，回答了问题
                     item.target_user_name = target.get('author').get('name')
                     item.target_user_avatar = target.get('author').get('avatar_url')
                     item.target_user_headline = target.get('author').get('headline')
                     item.target_user_url = 'https://www.zhihu.com/people/{user}/activities'.format(
                         user=target.get('author').get('url_token'))
                     item.target_title = target.get('question').get('title')
-                    item.target_title_url = 'https://www.zhihu.com/question/{id}'.format(id=target.get('question').get('id'))
+                    item.target_title_url = 'https://www.zhihu.com/question/{id}'.format(
+                        id=target.get('question').get('id'))
                     item.target_content = target.get('excerpt')
                     item.target_content_url = 'https://www.zhihu.com/question/{qid}/answer/{aid}'.format(
                         qid=target.get('question').get('id'), aid=target.get('id'))
                     item.thumbnail = target.get('thumbnail')
-                elif item.verb == 'MEMBER_VOTEUP_ARTICLE' or item.verb == 'MEMBER_CREATE_ARTICLE':   # 赞了文章，发表了文章
+                elif item.verb == 'MEMBER_VOTEUP_ARTICLE' or item.verb == 'MEMBER_CREATE_ARTICLE':  # 赞了文章，发表了文章
                     item.target_user_name = target.get('author').get('name')
                     item.target_user_avatar = target.get('author').get('avatar_url')
                     item.target_user_headline = target.get('author').get('headline')
                     item.target_user_url = 'https://www.zhihu.com/people/{user}/activities'.format(
                         user=target.get('author').get('url_token'))
                     item.target_title = target.get('title')
-                    item.target_title_url = 'https://zhuanlan.zhihu.com/p/{id}'.format(id=target.get('id'))
+                    item.target_title_url = 'https://zhuanlan.zhihu.com/p/{id}'.format(
+                        id=target.get('id'))
                     item.target_content = target.get('excerpt')
-                    item.target_content_url = 'https://zhuanlan.zhihu.com/p/{id}'.format(id=target.get('id'))
+                    item.target_content_url = 'https://zhuanlan.zhihu.com/p/{id}'.format(
+                        id=target.get('id'))
                     item.thumbnail = target.get('image_url')
-                elif item.verb == 'TOPIC_FOLLOW' or item.verb == 'TOPIC_CREATE':    # 关注了话题，创建了话题
+                elif item.verb == 'TOPIC_FOLLOW' or item.verb == 'TOPIC_CREATE':  # 关注了话题，创建了话题
                     item.target_title = target.get('name')
                     item.target_title_url = item.target_title_url = 'https://www.zhihu.com/topic/{id}'.format(
                         id=target.get('id'))
                     item.thumbnail = target.get('avatar_url')
-                elif item.verb == 'MEMBER_FOLLOW_COLUMN' or item.verb == 'MEMBER_CREATE_COLUMN':    # 关注了收藏夹，创建了收藏夹
+                elif item.verb == 'MEMBER_FOLLOW_COLUMN' or item.verb == 'MEMBER_CREATE_COLUMN':  # 关注了收藏夹，创建了收藏夹
                     item.target_user_name = target.get('author').get('name')
                     item.target_user_avatar = target.get('author').get('avatar_url')
                     item.target_user_headline = target.get('author').get('headline')
                     item.target_user_url = 'https://www.zhihu.com/people/{user}/activities'.format(
                         user=target.get('author').get('url_token'))
                     item.target_title = target.get('title')
-                    item.target_title_url = 'https://zhuanlan.zhihu.com/{id}'.format(id=target.get('id'))
+                    item.target_title_url = 'https://zhuanlan.zhihu.com/{id}'.format(
+                        id=target.get('id'))
                     item.thumbnail = target.get('image_url')
-                elif item.verb == 'MEMBER_CREATE_PIN' or item.verb == 'MEMBER_FOLLOW_PIN':      # 发布了想法，关注了想法
+                elif item.verb == 'MEMBER_CREATE_PIN' or item.verb == 'MEMBER_FOLLOW_PIN':  # 发布了想法，关注了想法
                     item.target_user_name = target.get('author').get('name')
                     item.target_user_avatar = target.get('author').get('avatar_url')
                     item.target_user_headline = target.get('author').get('headline')
                     item.target_user_url = 'https://www.zhihu.com/people/{user}/activities'.format(
                         user=target.get('author').get('url_token'))
                     item.target_content = target.get('excerpt_new')
-                    item.target_content_url = 'https://www.zhihu.com/pin/{id}'.format(id=target.get('id'))
+                    item.target_content_url = 'https://www.zhihu.com/pin/{id}'.format(
+                        id=target.get('id'))
                 item.action_text = data.get('action_text')
                 activities.append(item)
                 if len(activities) >= number:
                     break
             if len(activities) >= number or result.get('paging').get('is_end') or stop_flag:
                 break
-            response = requests.get(zhihu_user_activity_url.format(user=user, limit=10, after=activities[-1].id), headers=zhihu_header)
+            response = requests.get(
+                zhihu_user_activity_url.format(user=user, limit=10, after=activities[-1].id),
+                headers=zhihu_header)
             result = response.json()
         if log_zhihu:
             logging.info('Succeed in scraping activities of zhihu user: %s.' % user)
         return activities
 
     def scrape_question_by_id(self, id=0):
-        if not isinstance(id, int):
-            raise MethodParamError('Parameter \'id\' isn\'t an instance of type \'int\'!')
+        assert isinstance(id, int), 'Parameter \'id\' isn\'t an instance of type \'int\'!'
+
         if log_zhihu:
             logging.info('Scraping question of id: %d...' % id)
-        response = requests.get(zhihu_question_url.format(id=id, include=zhihu_question_query), headers=zhihu_header)
+        response = requests.get(zhihu_question_url.format(id=id, include=zhihu_question_query),
+                                headers=zhihu_header)
         if response.status_code == 404:
             if log_zhihu:
                 logging.warning('404 error. The question doesn\'t exist.')
@@ -314,44 +308,34 @@ class ZhihuSpider(SocialMediaSpider):
         self.scraped_questions[id] = item
         return item
 
-    def scrape_questions_by_user(self, user, number=0):
-        if not isinstance(user, str):
-            raise MethodParamError('Parameter \'user\' isn\'t an instance of type \'str\'!')
-        if not isinstance(number, int):
-            raise MethodParamError('Parameter \'number\' isn\'t an instance of type \'int\'!')
+    def scrape_questions_by_user(self, user, number=1):
+        assert isinstance(user, str), 'Parameter \'user\' isn\'t an instance of type \'str\'!'
+        assert isinstance(number, int), 'Parameter \'number\' isn\'t an instance of type \'int\'!'
+        assert number >= 1, 'Parameter \'number\' is smaller than 1!'
+
         if log_zhihu:
             logging.info('Scraping questions of zhihu user: %s...' % user)
-        response = requests.get(zhihu_user_questions_url.format(user=user, offset=0, limit=20), headers=zhihu_header)
-        if response.status_code == 404:     # 用户不存在或账号被封禁
+        response = requests.get(zhihu_user_questions_url.format(user=user, offset=0, limit=20),
+                                headers=zhihu_header)
+        if response.status_code == 404:  # 用户不存在或账号被封禁
             if log_zhihu:
                 logging.warning('404 error. The user doesn\'t exist or has been blocked.')
             return []
         result = response.json()
         total = result.get('paging').get('totals')
-        if number <= 0:
-            need_count = 10
-        else:
-            need_count = number if number < total else total
-        finish_count = 0
+        number = min((number, total))
         question_ids = []
-        for data in result.get('data'):
-            if finish_count >= need_count:
-                break
-            question_ids.append(data.get('id'))
-            finish_count += 1
-        if finish_count < need_count:
-            position = 0
-            while not result.get('paging').get('is_end'):
-                if finish_count >= need_count:
+        position = 0
+        while len(question_ids) < number:
+            for data in result.get('data'):
+                question_ids.append(data.get('id'))
+                if len(question_ids) >= number:
                     break
-                position += 20
-                next_page = zhihu_user_questions_url.format(user=user, offset=position, limit=20)
-                result = requests.get(next_page, headers=zhihu_header).json()
-                for data in result.get('data'):
-                    if finish_count >= need_count:
-                        break
-                    question_ids.append(data.get('id'))
-                    finish_count += 1
+            if len(question_ids) >= number:
+                break
+            position += 20
+            next_page = zhihu_user_questions_url.format(user=user, offset=position, limit=20)
+            result = requests.get(next_page, headers=zhihu_header).json()
         questions = []
         for question_id in question_ids:
             item = self.scrape_question_by_id(id=question_id)
@@ -362,11 +346,12 @@ class ZhihuSpider(SocialMediaSpider):
         return questions
 
     def scrape_answer_by_id(self, id):
-        if not isinstance(id, int):
-            raise MethodParamError('Parameter \'id\' isn\'t an instance of type \'int\'!')
+        assert isinstance(id, int), 'Parameter \'id\' isn\'t an instance of type \'int\'!'
+
         if log_zhihu:
             logging.info('Scraping answer of id: %d...' % id)
-        response = requests.get(zhihu_answer_url.format(id=id, include=zhihu_answer_query), headers=zhihu_header)
+        response = requests.get(zhihu_answer_url.format(id=id, include=zhihu_answer_query),
+                                headers=zhihu_header)
         if response.status_code == 404:
             if log_zhihu:
                 logging.warning('404 error. The answer doesn\'t exist.')
@@ -378,7 +363,8 @@ class ZhihuSpider(SocialMediaSpider):
         item.question_id = result.get('question').get('id')
         item.create_time = result.get('created_time')
         item.update_time = result.get('updated_time')
-        page = requests.get('https://www.zhihu.com/question/%d/answer/%d' % (item.question_id, id), headers=zhihu_header)
+        page = requests.get('https://www.zhihu.com/question/%d/answer/%d' % (item.question_id, id),
+                            headers=zhihu_header)
         bs = BeautifulSoup(page.text, 'lxml')
         content_span = bs.find('div', {'class': 'RichContent'}).div.span
         content = re.search(r'<span.*?>(.*)</span>', str(content_span)).group(1)
@@ -390,42 +376,32 @@ class ZhihuSpider(SocialMediaSpider):
         self.scraped_answers[id] = item
         return item
 
-    def scrape_answers_by_question(self, id, number=0):
-        if not isinstance(id, int):
-            raise MethodParamError('Parameter \'id\' isn\'t an instance of type \'int\'!')
-        if not isinstance(number, int):
-            raise MethodParamError('Parameter \'number\' isn\'t an instance of type \'int\'!')
+    def scrape_answers_by_question(self, id, number=1):
+        assert isinstance(id, int), 'Parameter \'id\' isn\'t an instance of type \'int\'!'
+        assert isinstance(number, int), 'Parameter \'number\' isn\'t an instance of type \'int\'!'
+        assert number >= 1, 'Parameter \'number\' is smaller than 1!'
+
         if log_zhihu:
             logging.info('Scraping answers of question: %d...' % id)
-        response = requests.get(zhihu_question_answers_url.format(id=id, offset=0, limit=20), headers=zhihu_header)
-        if response.status_code == 404:     # 问题不存在
+        response = requests.get(zhihu_question_answers_url.format(id=id, offset=0, limit=20),
+                                headers=zhihu_header)
+        if response.status_code == 404:  # 问题不存在
             if log_zhihu:
                 logging.warning('404 error. The question doesn\'t exist.')
             return []
         result = response.json()
         total = result.get('paging').get('totals')
-        if number <= 0:
-            need_count = 10
-        else:
-            need_count = number if number < total else total
-        finish_count = 0
+        number = min((number, total))
         answer_ids = []
-        for data in result.get('data'):
-            if finish_count >= need_count:
-                break
-            answer_ids.append(data.get('id'))
-            finish_count += 1
-        if finish_count < need_count:
-            while not result.get('paging').get('is_end'):
-                if finish_count >= need_count:
+        while len(answer_ids) < number:
+            for data in result.get('data'):
+                answer_ids.append(data.get('id'))
+                if len(answer_ids) >= number:
                     break
-                next_page = result.get('paging').get('next')
-                result = requests.get(next_page, headers=zhihu_header).json()
-                for data in result.get('data'):
-                    if finish_count >= need_count:
-                        break
-                    answer_ids.append(data.get('id'))
-                    finish_count += 1
+            if len(answer_ids) >= number:
+                break
+            next_page = result.get('paging').get('next')
+            result = requests.get(next_page, headers=zhihu_header).json()
         answers = []
         for answer_id in answer_ids:
             item = self.scrape_answer_by_id(id=answer_id)
@@ -435,44 +411,34 @@ class ZhihuSpider(SocialMediaSpider):
         self.scraped_question_answers[id] = answers
         return answers
 
-    def scrape_answers_by_user(self, user, number=0):
-        if not isinstance(user, str):
-            raise MethodParamError('Parameter \'user\' isn\'t an instance of type \'str\'!')
-        if not isinstance(number, int):
-            raise MethodParamError('Parameter \'number\' isn\'t an instance of type \'int\'!')
+    def scrape_answers_by_user(self, user, number=1):
+        assert isinstance(user, str), 'Parameter \'user\' isn\'t an instance of type \'str\'!'
+        assert isinstance(number, int), 'Parameter \'number\' isn\'t an instance of type \'int\'!'
+        assert number >= 1, 'Parameter \'number\' is smaller than 1!'
+
         if log_zhihu:
             logging.info('Scraping answers of zhihu user: %s...' % user)
-        response = requests.get(zhihu_user_answers_url.format(user=user, offset=0, limit=20), headers=zhihu_header)
-        if response.status_code == 404:     # 用户不存在或账号被封禁
+        response = requests.get(zhihu_user_answers_url.format(user=user, offset=0, limit=20),
+                                headers=zhihu_header)
+        if response.status_code == 404:  # 用户不存在或账号被封禁
             if log_zhihu:
                 logging.warning('404 error. The user doesn\'t exist or has been blocked.')
             return []
         result = response.json()
         total = result.get('paging').get('totals')
-        if number <= 0:
-            need_count = 10
-        else:
-            need_count = number if number < total else total
-        finish_count = 0
+        number = min((number, total))
         answer_ids = []
-        for data in result.get('data'):
-            if finish_count >= need_count:
-                break
-            answer_ids.append(data.get('id'))
-            finish_count += 1
-        if finish_count < need_count:
-            position = 0
-            while not result.get('paging').get('is_end'):
-                if finish_count >= need_count:
+        position = 0
+        while len(answer_ids) < number:
+            for data in result.get('data'):
+                answer_ids.append(data.get('id'))
+                if len(answer_ids) >= number:
                     break
-                position += 20
-                next_page = zhihu_user_answers_url.format(user=user, offset=position, limit=20)
-                result = requests.get(next_page, headers=zhihu_header).json()
-                for data in result.get('data'):
-                    if finish_count >= need_count:
-                        break
-                    answer_ids.append(data.get('id'))
-                    finish_count += 1
+            if len(answer_ids) >= number:
+                break
+            position += 20
+            next_page = zhihu_user_answers_url.format(user=user, offset=position, limit=20)
+            result = requests.get(next_page, headers=zhihu_header).json()
         answers = []
         for answer_id in answer_ids:
             item = self.scrape_answer_by_id(id=answer_id)
@@ -487,7 +453,7 @@ class ZhihuSpider(SocialMediaSpider):
             if log_zhihu:
                 logging.warning('Haven\'t scraped info of any zhihu user.')
             return
-        if user is None:    # 保存所有爬取过的用户信息
+        if user is None:  # 保存所有爬取过的用户信息
             csv_file = open(directory + 'all-user-info.csv', 'w')
             writer = csv.writer(csv_file)
             writer.writerow(('ID', '用户名', '性别', '头像链接', '行业', '一句话描述', '个人介绍', '提问数', '回答数',
@@ -503,22 +469,23 @@ class ZhihuSpider(SocialMediaSpider):
                     gender = '男'
                 else:
                     gender = '未知'
-                writer.writerow((info.id, info.name, gender, info.avatar_url, info.business, info.headline,
-                                 info.description, info.question_count, info.answer_count, info.article_count,
-                                 info.voteup_count, info.thanked_count, info.favorited_count, info.following_count,
-                                 info.follower_count, info.following_topic_count, info.following_column_count,
-                                 info.following_question_count, info.following_favlist_count,
-                                 '; '.join([str(edu) for edu in info.educations]),
-                                 '; '.join([str(emp) for emp in info.employments]),
-                                 '; '.join([str(loc) for loc in info.locations])))
+                writer.writerow(
+                    (info.id, info.name, gender, info.avatar_url, info.business, info.headline,
+                     info.description, info.question_count, info.answer_count, info.article_count,
+                     info.voteup_count, info.thanked_count, info.favorited_count,
+                     info.following_count,
+                     info.follower_count, info.following_topic_count, info.following_column_count,
+                     info.following_question_count, info.following_favlist_count,
+                     '; '.join([str(edu) for edu in info.educations]),
+                     '; '.join([str(emp) for emp in info.employments]),
+                     '; '.join([str(loc) for loc in info.locations])))
             csv_file.close()
             if log_zhihu:
                 logging.info('Succeed in saving infos of all scraped zhihu users.')
             return
 
         info = self.scraped_infos.get(user)
-        if not isinstance(info, ZhihuUserItem):
-            raise MethodParamError('\'info\' isn\'t an instance of ZhihuUserItem.')
+        assert isinstance(info, ZhihuUserItem), '\'info\' isn\'t an instance of ZhihuUserItem.'
         csv_file = open(directory + str(info.name) + '-info.csv', 'w')
         writer = csv.writer(csv_file)
         writer.writerow(('ID', '用户名', '性别', '头像链接', '行业', '一句话描述', '个人介绍', '提问数', '回答数',
@@ -531,9 +498,12 @@ class ZhihuSpider(SocialMediaSpider):
         else:
             gender = '未知'
         writer.writerow((info.id, info.name, gender, info.avatar_url, info.business, info.headline,
-                         info.description, info.question_count, info.answer_count, info.article_count,
-                         info.voteup_count, info.thanked_count, info.favorited_count, info.following_count,
-                         info.follower_count, info.following_topic_count, info.following_column_count,
+                         info.description, info.question_count, info.answer_count,
+                         info.article_count,
+                         info.voteup_count, info.thanked_count, info.favorited_count,
+                         info.following_count,
+                         info.follower_count, info.following_topic_count,
+                         info.following_column_count,
                          info.following_question_count, info.following_favlist_count,
                          '; '.join([str(edu) for edu in info.educations]),
                          '; '.join([str(emp) for emp in info.employments]),
@@ -548,8 +518,7 @@ class ZhihuSpider(SocialMediaSpider):
                 logging.warning('Haven\'t scraped follows of any zhihu user.')
             return
         infos = self.scraped_follows.get(user)
-        if not isinstance(infos, list):
-            raise MethodParamError('Haven\'t scraped follows of zhihu user: %s' % user)
+        assert isinstance(infos, list), 'Haven\'t scraped follows of zhihu user: %s' % user
         csv_file = open(directory + str(user) + '-follows.csv', 'w')
         writer = csv.writer(csv_file)
         writer.writerow(('ID', '用户名', '性别', '头像链接', '行业', '一句话描述', '个人介绍', '提问数', '回答数',
@@ -564,14 +533,15 @@ class ZhihuSpider(SocialMediaSpider):
                 gender = '男'
             else:
                 gender = '未知'
-            writer.writerow((info.id, info.name, gender, info.avatar_url, info.business, info.headline,
-                             info.description, info.question_count, info.answer_count, info.article_count,
-                             info.voteup_count, info.thanked_count, info.favorited_count, info.following_count,
-                             info.follower_count, info.following_topic_count, info.following_column_count,
-                             info.following_question_count, info.following_favlist_count,
-                             '; '.join([str(edu) for edu in info.educations]),
-                             '; '.join([str(emp) for emp in info.employments]),
-                             '; '.join([str(loc) for loc in info.locations])))
+            writer.writerow(
+                (info.id, info.name, gender, info.avatar_url, info.business, info.headline,
+                 info.description, info.question_count, info.answer_count, info.article_count,
+                 info.voteup_count, info.thanked_count, info.favorited_count, info.following_count,
+                 info.follower_count, info.following_topic_count, info.following_column_count,
+                 info.following_question_count, info.following_favlist_count,
+                 '; '.join([str(edu) for edu in info.educations]),
+                 '; '.join([str(emp) for emp in info.employments]),
+                 '; '.join([str(loc) for loc in info.locations])))
         csv_file.close()
         if log_zhihu:
             logging.info('Succeed in saving follows of zhihu user: %s.' % user)
@@ -582,8 +552,7 @@ class ZhihuSpider(SocialMediaSpider):
                 logging.warning('Haven\'t scraped followers of any zhihu user.')
             return
         infos = self.scraped_followers.get(user)
-        if not isinstance(infos, list):
-            raise MethodParamError('Haven\'t scraped followers of zhihu user: %s' % user)
+        assert isinstance(infos, list), 'Haven\'t scraped followers of zhihu user: %s' % user
         csv_file = open(directory + str(user) + '-followers.csv', 'w')
         writer = csv.writer(csv_file)
         writer.writerow(('ID', '用户名', '性别', '头像链接', '行业', '一句话描述', '个人介绍', '提问数', '回答数',
@@ -598,14 +567,15 @@ class ZhihuSpider(SocialMediaSpider):
                 gender = '男'
             else:
                 gender = '未知'
-            writer.writerow((info.id, info.name, gender, info.avatar_url, info.business, info.headline,
-                             info.description, info.question_count, info.answer_count, info.article_count,
-                             info.voteup_count, info.thanked_count, info.favorited_count, info.following_count,
-                             info.follower_count, info.following_topic_count, info.following_column_count,
-                             info.following_question_count, info.following_favlist_count,
-                             '; '.join([str(edu) for edu in info.educations]),
-                             '; '.join([str(emp) for emp in info.employments]),
-                             '; '.join([str(loc) for loc in info.locations])))
+            writer.writerow(
+                (info.id, info.name, gender, info.avatar_url, info.business, info.headline,
+                 info.description, info.question_count, info.answer_count, info.article_count,
+                 info.voteup_count, info.thanked_count, info.favorited_count, info.following_count,
+                 info.follower_count, info.following_topic_count, info.following_column_count,
+                 info.following_question_count, info.following_favlist_count,
+                 '; '.join([str(edu) for edu in info.educations]),
+                 '; '.join([str(emp) for emp in info.employments]),
+                 '; '.join([str(loc) for loc in info.locations])))
         csv_file.close()
         if log_zhihu:
             logging.info('Succeed in saving followers of zhihu user: %s.' % user)

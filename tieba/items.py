@@ -3,7 +3,7 @@
 @date: 2017/11/20
 @desc: Items for tieba scraping.
 """
-from base_item import SocialMediaItem
+from lib.base_item import SocialMediaItem
 
 
 class TiebaItem(SocialMediaItem):

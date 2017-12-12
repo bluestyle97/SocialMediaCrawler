@@ -3,18 +3,17 @@
 @date: 2017/11/20
 @desc: Search tieba users.
 """
-import re
 import chardet
+import re
 import requests
 from bs4 import BeautifulSoup
+from lib.configs import tieba_user_profile_url
 from urllib.request import quote
-from exceptions import MethodParamError
-from configs import tieba_user_profile_url
 
 
 def get_user_by_search(user):
-    if not isinstance(user, str):
-        raise MethodParamError('Parameter \'user\' isn\'t an instance of type \'str\'!')
+    assert isinstance(user, str), 'Parameter \'user\' isn\'t an instance of type \'str\'!'
+
     response = requests.get(tieba_user_profile_url.format(user=quote(user)))
     encoding = chardet.detect(response.content).get('encoding')
     bs = BeautifulSoup(response.content.decode(encoding), 'lxml')
@@ -26,9 +25,9 @@ def get_user_by_search(user):
 
 
 def get_user_by_homepage(url):
-    if not isinstance(url, str):
-        raise MethodParamError('Parameter \'url\' isn\'t an instance of type \'str\'!')
-    if not re.match(r'http://tieba.baidu.com/home/main\?un=.*&.*', url) and not re.match(       # 不合法的主页地址
+    assert isinstance(url, str), 'Parameter \'url\' isn\'t an instance of type \'str\'!'
+
+    if not re.match(r'http://tieba.baidu.com/home/main\?un=.*&.*', url) and not re.match(  # 不合法的主页地址
             r'http://tieba.baidu.com/home/main\?un=.*', url):
         return None, None
     response = requests.get(url)
@@ -47,6 +46,7 @@ if __name__ == '__main__':
     print(user)
     print(html)
 
-    user, html = get_user_by_homepage('http://tieba.baidu.com/home/main?un=%E6%84%9B%E4%BD%A0%E6%B2%92%E6%B3%95%E8%AA%AA')
+    user, html = get_user_by_homepage(
+        'http://tieba.baidu.com/home/main?un=%E6%84%9B%E4%BD%A0%E6%B2%92%E6%B3%95%E8%AA%AA')
     print(user)
     print(html)

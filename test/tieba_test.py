@@ -20,12 +20,12 @@ def scrape_user_forums_test(user):
         print(forum)
 
 
-def scrape_user_posts_test(user, number):
-    posts = spider.scrape_user_posts(user, number)
+def scrape_user_posts_test(user, before=None, after=None, number=10):
+    posts = spider.scrape_user_posts(user, before, after, number)
     for post in posts:
         print(post)
 
 
-scrape_user_info_test('愛你沒法說')
-scrape_user_forums_test('愛你沒法說')
-scrape_user_posts_test('愛你沒法說', 10)
+#scrape_user_info_test('愛你沒法說')
+#scrape_user_forums_test('愛你沒法說')
+scrape_user_posts_test('颜落_mmmmz', number=30000)
