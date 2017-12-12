@@ -23,11 +23,3 @@ class SpiderInitError(SocialMediaException):
 
     def __str__(self):
         return repr(self.info)
-
-
-class MethodParamError(SocialMediaException):
-    def __init__(self, value='Invalid item!'):
-        self.info = value
-    
-    def __str__(self):
-        return repr(self.info)
