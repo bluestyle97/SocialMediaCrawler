@@ -1,7 +1,12 @@
 """
-@author: Jiale Xu
-@date: 2017/11/25
-@desc: Test qzone spider.
+test.qzone_test
+~~~~~~~~~~~~~~~
+
+This module is prepared for testing qzone spider.
+
+:copyright: (c) 2017 by Jiale Xu.
+:date: 2017/11/25.
+:license: MIT License, see LICENSE.txt for more details.
 """
 from qzone.spider import QzoneSpider
 
