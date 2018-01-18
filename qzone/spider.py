@@ -1,32 +1,30 @@
 """
-@author: Jiale Xu
-@date: 2017/10/26
-@desc: Scraper for qzone.
+qzone.spider
+~~~~~~~~~~~~
+
+This module implements the spider of tencent qzone.
+
+:copyright: (c) 2017 by Jiale Xu.
+:date: 2017/10/26.
+:license: MIT License, see LICENSE.txt for more details.
 """
+import datetime
 import json
+import logging
 import os
 import re
-from math import ceil
-
 import requests
+from math import ceil
 from selenium import webdriver
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
-
-from lib.base_spider import SocialMediaSpider
-from lib.configs import qzone_comment_url, qzone_emotion_url, qzone_headers, qzone_like_url, \
-    qzone_message_url, qzone_visitor_url, log_path, log_qzone
+from lib.basis import SocialMediaSpider
+from lib.configs import qzone_comment_url, qzone_emotion_url, qzone_header, qzone_like_url, \
+    qzone_message_url, qzone_visitor_url
 from qzone.items import *
 
-driver = webdriver.PhantomJS(executable_path='../phantomjs', service_log_path=os.path.devnull)
 
-
-if log_qzone:
-    import logging
-    import datetime
-    log_file = log_path + '/qzone-log-%s.log' % (datetime.date.today())
-    logging.basicConfig(filename=log_file, format='%(asctime)s - %(name)s - %(levelname)s - %(module)s: %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S %p', level=10)
+driver = webdriver.PhantomJS(executable_path='../lib/phantomjs', service_log_path=os.path.devnull)
 
 
 # QQ空间计算g_tk的算法
@@ -38,30 +36,49 @@ def get_gtk(p_skey):
 
 
 class QzoneSpider(SocialMediaSpider):
-    def __init__(self, qq=None, password=None, cookie=None):
-        if cookie is None:
+    def __init__(self, qq=None, password=None, cookie_path=None, log=False, log_dir=''):
+        self._cookies = {}
+        self._gtk = 0
+        if cookie_path is None:
             if qq is None or password is None:
-                from lib.exceptions import SpiderInitError
-                raise SpiderInitError()
+                raise RuntimeError('QQ and password can\'t be empty when cookie_path is empty!')
+            assert isinstance(qq, int) and qq > 0, 'QQ should be a positive integer!'
+            assert isinstance(password, str) and 8 < len(password) < 16, 'Password should be a string contains 8-16 characters!'
             self.qq = qq
             self.password = password
-            self.cookies = {}
-            self.gtk = None
             self.login(qq=self.qq, password=self.password)
             self.save_cookie()
         else:
-            if not os.path.exists(cookie):
-                from lib.exceptions import SpiderInitError
-                raise SpiderInitError()
-            self.load_cookie(path=cookie)
+            if not os.path.exists(cookie_path):
+                raise FileNotFoundError('The cookie file does not exist!')
+            self.load_cookie(path=cookie_path)
+
+        # If `log` is True, then configure available path in order to save log files.
+        if log:
+            self._log = True
+            if not isinstance(log_dir, str):
+                raise TypeError('Parameter \'log_path\' should be a instance of type \'str\'. '
+                                'Found: %s.' % type(log_dir))
+            else:
+                if not os.path.exists(log_dir):
+                    if not os.path.exists(os.getcwd() + '/logs'):
+                        os.mkdir(os.getcwd() + '/logs')
+                    log_dir = os.getcwd() + '/logs'
+            log_file = log_dir + '/qzone-log-%s.log' % (datetime.date.today())
+            logging.basicConfig(
+                filename=log_file,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(module)s: %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S %p',
+                level=10)
+        # If `log` is False, do nothing.
+        else:
+            self._log = False
 
     def login(self, qq=None, password=None):
         if qq is None or password is None:
             qq, password = self.qq, self.password
         driver.maximize_window()
         driver.get('https://qzone.qq.com')
-        if log_qzone:
-            logging.info('Opening the qzone login page...')
         driver.implicitly_wait(5)
 
         # 模拟登陆
@@ -75,33 +92,33 @@ class QzoneSpider(SocialMediaSpider):
         wait = WebDriverWait(driver, 5)
         wait.until(ec.url_to_be('https://user.qzone.qq.com/%d' % qq))   # 登陆成功
 
-        self.cookies = {}
+        self._cookies = {}
         cookies = driver.get_cookies()
         for item in cookies:
-            self.cookies[item['name']] = item['value']
-        print(self.cookies)
-        p_skey = self.cookies['p_skey']
-        self.gtk = get_gtk(p_skey)      # 使用p_skey计算g_tk
+            self._cookies[item['name']] = item['value']
+        print(self._cookies)
+        p_skey = self._cookies['p_skey']
+        self._gtk = get_gtk(p_skey)      # 使用p_skey计算g_tk
 
     def scrape_emotion(self, qq=None, number=1):
-        if self.cookies is None or self.gtk is None:
-            if log_qzone:
+        if self._cookies is None or self._gtk is None:
+            if self._log:
                 logging.warning('Invalid cookie or g_tk.')
             return []
         if qq is None:
             qq = self.qq
-        if log_qzone:
+        if self._log:
             logging.info('Scraping emotions of qzone user: %d...' % qq)
-        response = requests.get(qzone_emotion_url.format(qq=qq, pos=0, gtk=self.gtk), cookies=self.cookies).text
+        response = requests.get(qzone_emotion_url.format(qq=qq, pos=0, gtk=self._gtk), cookies=self._cookies).text
         result = json.loads(response[17:-2])
 
         if result.get('code') < 0:       # 没有空间访问权限
-            if log_qzone:
+            if self._log:
                 logging.warning('No access to the qzone of %d.' % qq)
             return []
         total = result.get('total')      # 获取说说总数
         if total == 0:
-            if log_qzone:
+            if self._log:
                 logging.info('No emotion in the qzone of %d.' % qq)
             return []
         page_number = int(ceil(total * 1.0 / 20))    # 获取页数
@@ -115,8 +132,8 @@ class QzoneSpider(SocialMediaSpider):
         for i in range(page_number):
             if finish_count >= need_count:
                 break
-            emotion_response = requests.get(qzone_emotion_url.format(qq=qq, pos=pos, gtk=self.gtk),
-                                            cookies=self.cookies, headers=qzone_headers).text
+            emotion_response = requests.get(qzone_emotion_url.format(qq=qq, pos=pos, gtk=self._gtk),
+                                            cookies=self._cookies, headers=qzone_header).text
             emotion_result = json.loads(emotion_response[17:-2])
             pos += 20       # 每发出一次请求获取接下来20条说说
             if emotion_result.get('msglist') is None:     # 所有说说已读取完毕
@@ -145,14 +162,14 @@ class QzoneSpider(SocialMediaSpider):
                         pic_url = pic.get('pic_id').replace('\/', '/')
                         item.pictures.append(pic_url)
                 if 'source_name' in emotion.keys():
-                    item.source_name = emotion.get('source_name')       # 设备信息
+                    item.source = emotion.get('source_name')       # 设备信息
                 if emotion.get('lbs').get('idname') != '':      # 有位置信息
                     item.location = emotion.get('lbs').get('idname')
                 elif 'story_info' in emotion.keys():    # 照片含有位置信息
                     item.location = emotion.get('story_info').get('lbs').get('idname')
 
-                visitor_response = requests.get(qzone_visitor_url.format(qq=qq, id1=item.id, id2=item.id, gtk=self.gtk),
-                                                cookies=self.cookies, headers=qzone_headers).text
+                visitor_response = requests.get(qzone_visitor_url.format(qq=qq, id1=item.id, id2=item.id, gtk=self._gtk),
+                                                cookies=self._cookies, headers=qzone_header).text
                 if visitor_response[10:-2][-1] == '}':
                     visitor_result = json.loads(visitor_response[10:-2])
                 else:
@@ -164,8 +181,8 @@ class QzoneSpider(SocialMediaSpider):
                         visitor_item.name = visitor.get('name')
                         item.visitors.append(visitor_item)
 
-                like_response = requests.get(qzone_like_url.format(qq1=self.qq, qq2=qq, id=item.id, gtk=self.gtk),
-                                             cookies=self.cookies, headers=qzone_headers).content  # 请求获取点赞列表
+                like_response = requests.get(qzone_like_url.format(qq1=self.qq, qq2=qq, id=item.id, gtk=self._gtk),
+                                             cookies=self._cookies, headers=qzone_header).content  # 请求获取点赞列表
                 like_result = json.loads(like_response.decode('utf-8')[10:-3])
                 if like_result.get('code') == 0 and like_result.get('data').get('total_number') > 0:   # 请求成功且有人点赞
                     for like in like_result.get('data').get('like_uin_info'):
@@ -177,8 +194,8 @@ class QzoneSpider(SocialMediaSpider):
                 if emotion.get('cmtnum') > 0:       # 有评论
                     if emotion.get('commentlist') is None or emotion.get('cmtnum') > len(emotion.get('commentlist')): # 评论未加载完毕
                         comments_response = requests.get(qzone_comment_url.format(qq=qq, tid=emotion.get('tid'),
-                                                                                  num=emotion.get('cmtnum'), gtk=self.gtk),
-                                                         cookies=self.cookies, headers=qzone_headers).text
+                                                                                  num=emotion.get('cmtnum'), gtk=self._gtk),
+                                                         cookies=self._cookies, headers=qzone_header).text
                         comments_result = json.loads(comments_response[17:-2])
                         comments = comments_result.get('commentlist')
                     else:       # 评论已加载完毕
@@ -213,30 +230,30 @@ class QzoneSpider(SocialMediaSpider):
                         item.comments.append(comment_item)
                 finish_count += 1
                 emotion_list.append(item)
-        if log_qzone:
+        if self._log:
             logging.info('Succeed in scraping emotions of qzone user: %d.' % qq)
         return emotion_list
 
     def scrape_message(self, qq=None, number=1):
-        if self.cookies is None or self.gtk is None:
-            if log_qzone:
+        if self._cookies is None or self._gtk is None:
+            if self._log:
                 logging.warning('Invalid cookie or g_tk.')
             return []
         if qq is None:
             qq = self.qq
-        if log_qzone:
+        if self._log:
             logging.info('Scraping messages of qzone user: %d...' % qq)
-        response = requests.get(qzone_message_url.format(qq1=self.qq, qq2=qq, pos=0, gtk=self.gtk),
-                                cookies=self.cookies).text
+        response = requests.get(qzone_message_url.format(qq1=self.qq, qq2=qq, pos=0, gtk=self._gtk),
+                                cookies=self._cookies).text
         result = json.loads(response[10:-2])
 
         if result.get('code') < 0:       # 没有空间访问权限
-            if log_qzone:
+            if self._log:
                 logging.warning('No access to the qzone of %d.' % qq)
             return []
         total = result.get('data').get('total')      # 获取留言总数
         if total == 0:
-            if log_qzone:
+            if self._log:
                 logging.info('No message in the qzone of %d.' % qq)
             return []
         page_number = int(ceil(total * 1.0 / 10))   # 获取页数
@@ -250,8 +267,8 @@ class QzoneSpider(SocialMediaSpider):
         for i in range(page_number):
             if finish_count >= need_count:
                 break
-            message_response = requests.get(qzone_message_url.format(qq1=self.qq, qq2=qq, pos=pos, gtk=self.gtk),
-                                            cookies=self.cookies, headers=qzone_headers).text
+            message_response = requests.get(qzone_message_url.format(qq1=self.qq, qq2=qq, pos=pos, gtk=self._gtk),
+                                            cookies=self._cookies, headers=qzone_header).text
             message_result = json.loads(message_response[10:-2])
             pos += 10
             if message_result.get('data').get('commentList') is None:     # 所有留言已抓取完毕
@@ -279,35 +296,35 @@ class QzoneSpider(SocialMediaSpider):
                     item.content = '黄钻私密留言'
                 finish_count += 1
                 message_list.append(item)
-        if log_qzone:
+        if self._log:
             logging.info('Succeed in scraping messages of qzone user: %d.' % qq)
         return message_list
 
     def save_cookie(self, path='./cookie.txt'):
-        if self.cookies == {} or self.gtk is None:
+        if self._cookies == {} or self._gtk is None:
             return
         file_cookie = open(path, 'w')
-        for key in self.cookies:
-            file_cookie.write(key + '=' + str(self.cookies[key]) + '\n')
-        file_cookie.write('g_tk=' + str(self.gtk) + '\n')
+        for key in self._cookies:
+            file_cookie.write(key + '=' + str(self._cookies[key]) + '\n')
+        file_cookie.write('g_tk=' + str(self._gtk) + '\n')
         file_cookie.write('qq=' + str(self.qq))
         file_cookie.close()
-        if log_qzone:
+        if self._log:
             logging.info('Save cookie successfully.')
 
     def load_cookie(self, path='./cookie.txt'):
         if not os.path.exists(path):
             return
-        self.cookies = {}
+        self._cookies = {}
         file_cookie = open(path, 'r')
         for line in file_cookie:
             lst = line.strip().split('=')
             if lst[0] == 'g_tk':
-                self.gtk = int(lst[1])
+                self._gtk = int(lst[1])
             elif lst[0] == 'qq':
                 self.qq = int(lst[1])
             else:
-                self.cookies[lst[0]] = lst[1]
+                self._cookies[lst[0]] = lst[1]
         file_cookie.close()
-        if log_qzone:
+        if self._log:
             logging.info('Load cookie successfully.')
