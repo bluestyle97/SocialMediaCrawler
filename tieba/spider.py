@@ -5,10 +5,9 @@ tieba.spider
 This module implements the spider of baidu tieba.
 
 :copyright: (c) 2017 by Jiale Xu.
-:create time: 2017/11/20.
+:date: 2017/11/20.
 :license: MIT License, see LICENSE.txt for more details.
 """
-
 import datetime
 import logging
 import re
@@ -17,13 +16,13 @@ import os
 import time
 from urllib.request import quote
 from bs4 import BeautifulSoup
-from lib.base_spider import SocialMediaSpider
+from lib.basis import SocialMediaSpider
 from lib.configs import tieba_user_homepage_url, tieba_user_post_url
 from tieba.items import TiebaUserItem, TiebaPostItem
 
 
 class TiebaSpider(SocialMediaSpider):
-    def __init__(self, log=False, log_dir=None):
+    def __init__(self, log=False, log_dir=''):
         """
         :param log: if True, save logs while scraping; if False, don't save.
         :param log_dir: directory of log files, only available when `log` is True.
@@ -36,14 +35,10 @@ class TiebaSpider(SocialMediaSpider):
         # If `log` is True, then config available path to save log files.
         if log:
             self._log = True
-            if log_dir is None:
-                if not os.path.exists(os.getcwd() + '/logs'):
-                    os.mkdir(os.getcwd() + '/logs')
-                log_dir = os.getcwd() + '/logs'
+            if not isinstance(log_dir, str):
+                raise TypeError('Parameter \'log_path\' should be a instance of type \'str\'. '
+                                'Found: %s.' % type(log_dir))
             else:
-                if not isinstance(log_dir, str):
-                    raise TypeError('Parameter \'log_path\' should be a instance of type \'str\'. '
-                                    'Found: %s.' % type(log_dir))
                 if not os.path.exists(log_dir):
                     if not os.path.exists(os.getcwd() + '/logs'):
                         os.mkdir(os.getcwd() + '/logs')
@@ -106,7 +101,7 @@ class TiebaSpider(SocialMediaSpider):
 
         return item
 
-    def scrape_user_forums(self, user):
+    def scrape_user_forum(self, user):
         """
         Scrape the names of forums which are followed by the user.
         :param user: name of the user who is to be scraped
@@ -140,7 +135,7 @@ class TiebaSpider(SocialMediaSpider):
 
         return forums
 
-    def scrape_user_posts(self, user, before=None, after=None, number=1):
+    def scrape_user_post(self, user, before=None, after=None, number=1):
         """
         Scrape the posts of the user.
         :param user: name of the user who is to be scraped
